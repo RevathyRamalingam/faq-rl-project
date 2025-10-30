@@ -7,6 +7,7 @@ from typing import Any, TypedDict
 
 from anthropic import AsyncAnthropic
 from anthropic.types import MessageParam, ToolUnionParam
+from grader import grade_faq_update, expected_faq_text
 
 MAX_TOKENS = 1000
 
@@ -190,16 +191,14 @@ async def run_single_test(
     )
 
     success = result == expected_answer
-
     if success:
-        print(f"✓ Run {run_id}: SUCCESS - Got {result}")
+        print(f"✓ Run {run_id}: SUCCESS - Got {result} expected {expected_answer}") 
     else:
         print(f"✗ Run {run_id}: FAILURE - Got {result}, expected {expected_answer}")
-
+    
     return run_id, success, result
 
-
-async def main(concurrent: bool = True):
+async def main():
     tools: list[ToolUnionParam] = [
         {
             "name": "python_expression",
@@ -209,7 +208,7 @@ async def main(concurrent: bool = True):
                 "properties": {
                     "expression": {
                         "type": "string",
-                        "description": "Will be passed to exec(). Use print() to output something. Returns stdout. ",
+                        "description": "Will be passed to exec(). Use print() to output something. Returns stdout.",
                     }
                 },
                 "required": ["expression"],
@@ -231,16 +230,41 @@ async def main(concurrent: bool = True):
         "submit_answer": submit_answer_tool,
     }
 
-    # Run the test 10 times and track success rate
-    num_runs = 10
-    expected_answer = 8769
-    prompt = "Calculate (2^10 + 3^5) * 7 - 100. Use the python_expression tool and then submit the answer."
+    # FAQ update RL TASK 
+    with open("FAQ.md") as f:
+        current_faq = f.read()
+    with open("input.json") as f:
+        input_data = json.load(f)
 
-    execution_mode = "concurrently" if concurrent else "sequentially"
-    print(f"Running {num_runs} test iterations {execution_mode}...")
-    print("=" * 60)
+    question = input_data["question"]
+    answer = input_data["answer"]
 
-    # Create all test coroutines
+    prompt = f"""
+You are maintaining a file called FAQ.md that contains Markdown-formatted FAQs.
+
+Here is the current file content:
+
+{current_faq}
+
+You are given a new question and answer pair:
+Q: {question}
+A: {answer}
+
+Your task:
+1. If this question already exists, update its answer.
+2. Otherwise, append it to the bottom in the same Markdown format.
+3. Preserve all existing questions and formatting.
+
+Once done, use the python_expression tool to write the updated file back to 'FAQ.md'
+(e.g., open('FAQ.md','w').write(updated_text)),
+then submit the final file text with the submit_answer tool.
+"""
+
+    
+    num_runs = 3
+
+    print(f"Running {num_runs} FAQ RL task tests...\n{'='*60}")
+    expected_answer = expected_faq_text()
     tasks = [
         run_single_test(
             run_id=i + 1,
@@ -254,33 +278,15 @@ async def main(concurrent: bool = True):
         for i in range(num_runs)
     ]
 
-    # Run concurrently or sequentially based on the flag
-    if concurrent:
-        # Process results as they complete
-        results = []
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
-            results.append(result)
-    else:
-        # Run sequentially by awaiting each task in order
-        results = []
-        for task in tasks:
-            result = await task
-            results.append(result)
+    results = []
+    for coro in asyncio.as_completed(tasks):
+        result = await coro  
+        results.append(result)
 
-    # Count successes
-    successes = sum(1 for _, success, _ in results)
-
-    # Calculate and display pass rate
-    pass_rate = (successes / num_runs) * 100
-    print(f"\n{'=' * 60}")
-    print("Test Results:")
-    print(f"  Passed: {successes}/{num_runs}")
-    print(f"  Failed: {num_runs - successes}/{num_runs}")
-    print(f"  Pass Rate: {pass_rate:.1f}%")
-    print(f"{'=' * 60}")
-
+    # After running, call the grader for verification
+    from grader import grade_faq_update
+    score = grade_faq_update()
+    print(f"\nFAQ update verification score: {score}")
 
 if __name__ == "__main__":
-    # Set to True for concurrent execution, False for sequential execution
-    asyncio.run(main(concurrent=True))
+    asyncio.run(main())

@@ -1,5 +1,5 @@
 [project]
-name = "hello-py"
+name = "faq-rl-project"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
