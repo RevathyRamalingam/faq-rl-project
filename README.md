@@ -1,4 +1,4 @@
-# 🤖 FAQ RL Task — Anthropic Tool Use Agent
+# 🤖 FAQ RL Project Task — Anthropic Tool Use Agent
 
 This project demonstrates an **RL (Reinforcement Learning) style task** where an AI agent (using the **Anthropic Claude API**) maintains a `FAQ.md` file dynamically.
 
